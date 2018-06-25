@@ -18,14 +18,13 @@ if [ -z "$1" ]; then
   echo "Need version as argument"
   exit -1
 fi
-
 if [ -z "$GITHUB_TOKEN" ]; then
   echo "Need GITHUB_TOKEN env set."
   exit -1
 fi
 
 branch=$(git symbolic-ref --short -q HEAD)
-if [ "$branch" != "develop" ]; then
+if [ "$branch" != "exode" ]; then
   echo "Need to be on develop branch."
   exit -1
 fi
@@ -46,19 +45,9 @@ then
   exit 0
 fi
 
-(
-  cd client
-  npm version --no-git-tag-version --no-commit-hooks "$1"
-)
-
-npm version -f --no-git-tag-version --no-commit-hooks "$1"
-
-git commit package.json client/package.json -m "Bumped to version $version"
-git tag -s -a "$version" -m "$version"
-
-npm run build
-rm "./client/dist/en_US/stats.json"
-rm "./client/dist/embed-stats.json"
+#npm run build
+#rm "./client/dist/en_US/stats.json"
+#rm "./client/dist/embed-stats.json"
 
 # Creating the archives
 (
@@ -70,17 +59,12 @@ rm "./client/dist/embed-stats.json"
                           "$directory_name/dist" "$directory_name/package.json" \
                           "$directory_name/scripts" "$directory_name/support" \
                           "$directory_name/tsconfig.json" "$directory_name/yarn.lock")
-  maintainer_public_key="583A612D890159BE"
-
   # temporary setup
   cd ..
   ln -s "PeerTube" "$directory_name"
 
   # archive creation + signing
   zip -r "PeerTube/$zip_name" "${directories_to_archive[@]}"
-  gpg --armor --detach-sign -u "$maintainer_public_key" "PeerTube/$zip_name"
-  XZ_OPT=-e9 tar cfJ "PeerTube/$tar_name" "${directories_to_archive[@]}"
-  gpg --armor --detach-sign -u "$maintainer_public_key" "PeerTube/$tar_name"
 
   # temporary setup destruction
   rm "$directory_name"
@@ -88,19 +72,20 @@ rm "./client/dist/embed-stats.json"
 
 # Creating the release on GitHub, with the created archives
 (
-  git push origin --tag
+  git tag "$version"
+  git push --tag
 
-  github-release release --user chocobozzz --repo peertube --tag "$version" --name "$version" --description "$changelog"
-  github-release upload --user chocobozzz --repo peertube --tag "$version" --name "$zip_name" --file "$zip_name"
-  github-release upload --user chocobozzz --repo peertube --tag "$version" --name "$zip_name.asc" --file "$zip_name.asc"
-  github-release upload --user chocobozzz --repo peertube --tag "$version" --name "$tar_name" --file "$tar_name"
-  github-release upload --user chocobozzz --repo peertube --tag "$version" --name "$tar_name.asc" --file "$tar_name.asc"
+  github-release release --user phief --repo peertube --tag "$version" --name "$version" --description "$changelog"
+  github-release upload --user phief --repo peertube --tag "$version" --name "$zip_name" --file "$zip_name"
+  github-release upload --user phief --repo peertube --tag "$version" --name "$zip_name.asc" --file "$zip_name.asc"
+  github-release upload --user phief --repo peertube --tag "$version" --name "$tar_name" --file "$tar_name"
+  github-release upload --user phief --repo peertube --tag "$version" --name "$tar_name.asc" --file "$tar_name.asc"
 
-  git push origin develop
+  git push origin exode
 
   # Update master branch
   git checkout master
-  git rebase develop
+  git rebase exode
   git push origin master
-  git checkout develop
+  git checkout exode
 )
