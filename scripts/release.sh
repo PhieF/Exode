@@ -74,11 +74,8 @@ git tag -a "$version" -m "$version"
 (
   git push origin --tag
 
-  github-release release --user phief --repo peertube --tag "$version" --name "$version" --description "$changelog"
-  github-release upload --user phief --repo peertube --tag "$version" --name "$zip_name" --file "$zip_name"
-  github-release upload --user phief --repo peertube --tag "$version" --name "$zip_name.asc" --file "$zip_name.asc"
-  github-release upload --user phief --repo peertube --tag "$version" --name "$tar_name" --file "$tar_name"
-  github-release upload --user phief --repo peertube --tag "$version" --name "$tar_name.asc" --file "$tar_name.asc"
+  github-release release --user phief --repo exode --tag "$version" --name "$version" --description "$changelog"
+  github-release upload --user phief --repo exode --tag "$version" --name "$zip_name" --file "$zip_name"
 
   git push origin exode
 
