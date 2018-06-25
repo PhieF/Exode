@@ -29,29 +29,15 @@ DB_HOST=$(node -e "console.log(require('js-yaml').safeLoad(fs.readFileSync('$PEE
 DB_SUFFIX=$(node -e "console.log(require('js-yaml').safeLoad(fs.readFileSync('$PEERTUBE_PATH/config/production.yaml', 'utf8'))['database']['suffix'])")
 mkdir -p $PEERTUBE_PATH/backup
 
-PGPASSWORD=$DB_PASS pg_dump -U $DB_USER -h $DB_HOST -F c "peertube${DB_SUFFIX}" -f "$SQL_BACKUP_PATH"
+# Get and Display the Latest Version
+VERSION=$(curl -s https://api.github.com/repos/phief/exode/releases/latest | grep tag_name | cut -d '"' -f 4)
+echo "Latest Peertube version is $VERSION"
+wget -q "https://api.github.com/repos/PhieF/Exode/zipball/${VERSION}" -O "$PEERTUBE_PATH/versions/peertube-${VERSION}.zip"
 
-# If there is a pre-release, give the user a choice which one to install.
-RELEASE_VERSION=$(curl -s https://api.github.com/repos/chocobozzz/peertube/releases/latest | grep tag_name | cut -d '"' -f 4)
-PRE_RELEASE_VERSION=$(curl -s https://api.github.com/repos/chocobozzz/peertube/releases | grep tag_name | head -1 | cut -d '"' -f 4)
-
-if [ "$RELEASE_VERSION" != "$PRE_RELEASE_VERSION" ]; then
-  echo -e "Which version do you want to install?\n[1] $RELEASE_VERSION (stable) \n[2] $PRE_RELEASE_VERSION (pre-release)"
-  read choice
-  case $choice in
-      [1]* ) VERSION="$RELEASE_VERSION";;
-      [2]* ) VERSION="$PRE_RELEASE_VERSION";;
-      * ) exit;
-  esac
-else
-  VERSION="$RELEASE_VERSION"
-fi
-
-echo "Installing Peertube version $VERSION"
-wget -q "https://github.com/Chocobozzz/PeerTube/releases/download/${VERSION}/peertube-${VERSION}.zip" -O "$PEERTUBE_PATH/versions/peertube-${VERSION}.zip"
 cd $PEERTUBE_PATH/versions
 unzip -o "peertube-${VERSION}.zip"
 rm -f "peertube-${VERSION}.zip"
+mv PhieF* "peertube-${VERSION}"
 
 # Upgrade Scripts
 rm -rf $PEERTUBE_PATH/peertube-latest
