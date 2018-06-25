@@ -18,15 +18,15 @@ if [ -z "$1" ]; then
   echo "Need version as argument"
   exit -1
 fi
-
 if [ -z "$GITHUB_TOKEN" ]; then
   echo "Need GITHUB_TOKEN env set."
   exit -1
 fi
 
 branch=$(git symbolic-ref --short -q HEAD)
-if [ "$branch" != "develop" ] && [[ "$branch" != feature/* ]]; then
-  echo "Need to be on develop or release branch."
+
+if [ "$branch" != "exode" ]; then
+  echo "Need to be on develop branch."
   exit -1
 fi
 
@@ -50,17 +50,7 @@ echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
   exit 0
 fi
-
-(
-  cd client
-  npm version --no-git-tag-version --no-commit-hooks "$1"
-)
-
-npm version -f --no-git-tag-version --no-commit-hooks "$1"
-
-git commit package.json client/package.json -m "Bumped to version $version"
-git tag -s -a "$version" -m "$version"
-
+git tag -a "$version" -m "$version"
 npm run build
 rm "./client/dist/en_US/stats.json"
 rm "./client/dist/embed-stats.json"
@@ -75,17 +65,12 @@ rm "./client/dist/embed-stats.json"
                           "$directory_name/dist" "$directory_name/package.json" \
                           "$directory_name/scripts" "$directory_name/support" \
                           "$directory_name/tsconfig.json" "$directory_name/yarn.lock")
-  maintainer_public_key="583A612D890159BE"
-
   # temporary setup
   cd ..
-  ln -s "PeerTube" "$directory_name"
+  ln -s "Exode" "$directory_name"
 
   # archive creation + signing
-  zip -r "PeerTube/$zip_name" "${directories_to_archive[@]}"
-  gpg --armor --detach-sign -u "$maintainer_public_key" "PeerTube/$zip_name"
-  XZ_OPT=-e9 tar cfJ "PeerTube/$tar_name" "${directories_to_archive[@]}"
-  gpg --armor --detach-sign -u "$maintainer_public_key" "PeerTube/$tar_name"
+  zip -r "Exode/$zip_name" "${directories_to_archive[@]}"
 
   # temporary setup destruction
   rm "$directory_name"
@@ -95,25 +80,14 @@ rm "./client/dist/embed-stats.json"
 (
   git push origin --tag
 
-  if [ -z "$github_prerelease_option" ]; then
-    github-release release --user chocobozzz --repo peertube --tag "$version" --name "$version" --description "$changelog"
-  else
-    github-release release --user chocobozzz --repo peertube --tag "$version" --name "$version" --description "$changelog" "$github_prerelease_option"
-  fi
+  github-release phief/exode "$version" exode "$changelog" "$zip_name"
 
-  github-release upload --user chocobozzz --repo peertube --tag "$version" --name "$zip_name" --file "$zip_name"
-  github-release upload --user chocobozzz --repo peertube --tag "$version" --name "$zip_name.asc" --file "$zip_name.asc"
-  github-release upload --user chocobozzz --repo peertube --tag "$version" --name "$tar_name" --file "$tar_name"
-  github-release upload --user chocobozzz --repo peertube --tag "$version" --name "$tar_name.asc" --file "$tar_name.asc"
+  #github-release upload --user phief --repo exode --tag "$version" --name "$zip_name" --file "$zip_name"
+  git push origin exode
 
-  git push origin "$branch"
-
-  # Only update master if it is not a pre release
-  if [ -z "$github_prerelease_option" ]; then
-      # Update master branch
-      git checkout master
-      git merge "$branch"
-      git push origin master
-      git checkout "$branch"
-  fi
+  # Update master branch
+  git checkout master
+  git rebase exode
+  git push origin master
+  git checkout exode
 )
