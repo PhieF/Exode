@@ -40,6 +40,25 @@
       </div>
 
       <div class="panel-block">
+        <div i18n class="block-title">Musics</div>
+
+        <a routerLink="/videos/trending" [queryParams]="{category: '1'}" routerLinkActive="active">
+          <span class="icon icon-videos-trending"></span>
+          <ng-container i18n>Trending</ng-container>
+        </a>
+
+        <a routerLink="/videos/recently-added" [queryParams]="{category: '1'}" routerLinkActive="active">
+          <span class="icon icon-videos-recently-added"></span>
+          <ng-container i18n>Recently added</ng-container>
+        </a>
+
+        <a routerLink="/videos/local" [queryParams]="{category: '1'}" routerLinkActive="active">
+          <span class="icon icon-videos-local"></span>
+          <ng-container i18n>Local</ng-container>
+        </a>
+      </div>
+
+      <div class="panel-block">
         <div i18n class="block-title">Videos</div>
 
         <a *ngIf="isLoggedIn" routerLink="/videos/subscriptions" routerLinkActive="active">
@@ -98,3 +117,4 @@
 </div>
 
 <my-language-chooser #languageChooserModal></my-language-chooser>
+
