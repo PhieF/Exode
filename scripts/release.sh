@@ -44,7 +44,7 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]
 then
   exit 0
 fi
-
+git tag -a "$version" -m "$version"
 #npm run build
 #rm "./client/dist/en_US/stats.json"
 #rm "./client/dist/embed-stats.json"
@@ -72,8 +72,7 @@ fi
 
 # Creating the release on GitHub, with the created archives
 (
-  git tag "$version"
-  git push --tag
+  git push origin --tag
 
   github-release release --user phief --repo peertube --tag "$version" --name "$version" --description "$changelog"
   github-release upload --user phief --repo peertube --tag "$version" --name "$zip_name" --file "$zip_name"
