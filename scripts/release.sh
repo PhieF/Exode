@@ -51,9 +51,9 @@ then
   exit 0
 fi
 git tag -a "$version" -m "$version"
-#npm run build
-#rm "./client/dist/en_US/stats.json"
-#rm "./client/dist/embed-stats.json"
+npm run build
+rm "./client/dist/en_US/stats.json"
+rm "./client/dist/embed-stats.json"
 
 # Creating the archives
 (
