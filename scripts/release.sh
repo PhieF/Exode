@@ -67,10 +67,10 @@ git tag -a "$version" -m "$version"
                           "$directory_name/tsconfig.json" "$directory_name/yarn.lock")
   # temporary setup
   cd ..
-  ln -s "PeerTube" "$directory_name"
+  ln -s "Exode" "$directory_name"
 
   # archive creation + signing
-  zip -r "PeerTube/$zip_name" "${directories_to_archive[@]}"
+  zip -r "Exode/$zip_name" "${directories_to_archive[@]}"
 
   # temporary setup destruction
   rm "$directory_name"
@@ -80,8 +80,9 @@ git tag -a "$version" -m "$version"
 (
   git push origin --tag
 
-  github-release release --user phief --repo exode --tag "$version" --name "$version" --description "$changelog"
-  github-release upload --user phief --repo exode --tag "$version" --name "$zip_name" --file "$zip_name"
+  github-release phief/exode "$version" exode "$changelog" "$zip_name"
+
+  #github-release upload --user phief --repo exode --tag "$version" --name "$zip_name" --file "$zip_name"
   git push origin exode
 
   # Update master branch
