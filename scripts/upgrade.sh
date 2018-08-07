@@ -29,7 +29,7 @@ pg_dump -U peertube -W -h localhost -F c peertube_prod -f "$SQL_BACKUP_PATH"
 # Get and Display the Latest Version
 VERSION=$(curl -s https://api.github.com/repos/phief/exode/releases/latest | grep tag_name | cut -d '"' -f 4)
 echo "Latest Peertube version is $VERSION"
-wget -q "https://api.github.com/repos/PhieF/Exode/zipball/${VERSION}" -O "$PEERTUBE_PATH/versions/peertube-${VERSION}.zip"
+wget -q "https://github.com/PhieF/Exode/releases/download/${VERSION}/peertube-${VERSION}.zip" -O "$PEERTUBE_PATH/versions/peertube-${VERSION}.zip"
 cd $PEERTUBE_PATH/versions
 unzip -o "peertube-${VERSION}.zip"
 rm -f "peertube-${VERSION}.zip"
