@@ -12,6 +12,7 @@
         <span i18n>Select the file to upload</span>
         <input #videofileInput type="file" name="videofile" id="videofile" [accept]="videoExtensions" (change)="fileChange()" />
       </div>
+      <span class="button-file-extension">(.mp4, .webm, .ogv)</span>
 
       <div class="form-group form-group-channel">
         <label i18n for="first-step-channel">Channel</label>
@@ -45,7 +46,7 @@
   <!-- Hidden because we want to load the component -->
   <form [hidden]="!isUploadingVideo" novalidate [formGroup]="form">
     <my-video-edit
-      [form]="form" [formErrors]="formErrors"
+      [form]="form" [formErrors]="formErrors" [videoCaptions]="videoCaptions"
       [validationMessages]="validationMessages" [videoPrivacies]="videoPrivacies" [userVideoChannels]="userVideoChannels"
     ></my-video-edit>
 

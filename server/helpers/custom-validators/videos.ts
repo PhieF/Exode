@@ -110,7 +110,7 @@ function isScheduleVideoUpdatePrivacyValid (value: number) {
     )
 }
 
-function isVideoFileInfoHashValid (value: string) {
+function isVideoFileInfoHashValid (value: string | null | undefined) {
   return exists(value) && validator.isLength(value, VIDEOS_CONSTRAINTS_FIELDS.INFO_HASH)
 }
 
@@ -118,12 +118,39 @@ function isVideoFileResolutionValid (value: string) {
   return exists(value) && validator.isInt(value + '')
 }
 
+function isVideoFPSResolutionValid (value: string) {
+  return value === null || validator.isInt(value + '')
+}
+
 function isVideoFileSizeValid (value: string) {
   return exists(value) && validator.isInt(value + '', VIDEOS_CONSTRAINTS_FIELDS.FILE_SIZE)
 }
 
+function checkUserCanManageVideo (user: UserModel, video: VideoModel, right: UserRight, res: Response) {
+  // Retrieve the user who did the request
+  if (video.isOwned() === false) {
+    res.status(403)
+       .json({ error: 'Cannot manage a video of another server.' })
+       .end()
+    return false
+  }
+
+  // Check if the user can delete the video
+  // The user can delete it if he has the right
+  // Or if s/he is the video's account
+  const account = video.VideoChannel.Account
+  if (user.hasRight(right) === false && account.userId !== user.id) {
+    res.status(403)
+       .json({ error: 'Cannot manage a video of another user.' })
+       .end()
+    return false
+  }
+
+  return true
+}
+
 async function isVideoExist (id: string, res: Response) {
-  let video: VideoModel
+  let video: VideoModel | null
 
   if (validator.isInt(id)) {
     video = await VideoModel.loadAndPopulateAccountAndServerAndTags(+id)
@@ -131,7 +158,7 @@ async function isVideoExist (id: string, res: Response) {
     video = await VideoModel.loadByUUIDAndPopulateAccountAndServerAndTags(id)
   }
 
-  if (!video) {
+  if (video === null) {
     res.status(404)
        .json({ error: 'Video not found' })
        .end()
@@ -146,7 +173,7 @@ async function isVideoExist (id: string, res: Response) {
 async function isVideoChannelOfAccountExist (channelId: number, user: UserModel, res: Response) {
   if (user.hasRight(UserRight.UPDATE_ANY_VIDEO) === true) {
     const videoChannel = await VideoChannelModel.loadAndPopulateAccount(channelId)
-    if (!videoChannel) {
+    if (videoChannel === null) {
       res.status(400)
          .json({ error: 'Unknown video video channel on this instance.' })
          .end()
@@ -159,7 +186,7 @@ async function isVideoChannelOfAccountExist (channelId: number, user: UserModel,
   }
 
   const videoChannel = await VideoChannelModel.loadByIdAndAccount(channelId, user.Account.id)
-  if (!videoChannel) {
+  if (videoChannel === null) {
     res.status(400)
        .json({ error: 'Unknown video video channel for this account.' })
        .end()
@@ -175,6 +202,7 @@ async function isVideoChannelOfAccountExist (channelId: number, user: UserModel,
 
 export {
   isVideoCategoryValid,
+  checkUserCanManageVideo,
   isVideoLicenceValid,
   isVideoLanguageValid,
   isVideoTruncatedDescriptionValid,
@@ -182,6 +210,7 @@ export {
   isVideoFileInfoHashValid,
   isVideoNameValid,
   isVideoTagsValid,
+  isVideoFPSResolutionValid,
   isScheduleVideoUpdatePrivacyValid,
   isVideoAbuseReasonValid,
   isVideoFile,

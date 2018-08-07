@@ -7,7 +7,7 @@ import { LoadingBarService } from '@ngx-loading-bar/core'
 import { NotificationsService } from 'angular2-notifications'
 import { BytesPipe } from 'ngx-pipes'
 import { Subscription } from 'rxjs'
-import { VideoPrivacy } from '../../../../../shared/models/videos'
+import { VideoConstant, VideoPrivacy } from '../../../../../shared/models/videos'
 import { AuthService, ServerService } from '../../core'
 import { FormReactive } from '../../shared'
 import { populateAsyncUserVideoChannels } from '../../shared/misc/utils'
@@ -15,6 +15,9 @@ import { VideoEdit } from '../../shared/video/video-edit.model'
 import { VideoService } from '../../shared/video/video.service'
 import { I18n } from '@ngx-translate/i18n-polyfill'
 import { FormValidatorService } from '@app/shared/forms/form-validators/form-validator.service'
+import { switchMap } from 'rxjs/operators'
+import { VideoCaptionService } from '@app/shared/video-caption'
+import { VideoCaptionEdit } from '@app/shared/video-caption/video-caption-edit.model'
 
 @Component({
   selector: 'my-videos-add',
@@ -43,9 +46,10 @@ export class VideoAddComponent extends FormReactive implements OnInit, OnDestroy
 
   userVideoChannels: { id: number, label: string, support: string }[] = []
   userVideoQuotaUsed = 0
-  videoPrivacies = []
+  videoPrivacies: VideoConstant<string>[] = []
   firstStepPrivacyId = 0
   firstStepChannelId = 0
+  videoCaptions: VideoCaptionEdit[] = []
 
   constructor (
     protected formValidatorService: FormValidatorService,
@@ -56,7 +60,8 @@ export class VideoAddComponent extends FormReactive implements OnInit, OnDestroy
     private serverService: ServerService,
     private videoService: VideoService,
     private loadingBar: LoadingBarService,
-    private i18n: I18n
+    private i18n: I18n,
+    private videoCaptionService: VideoCaptionService
   ) {
     super()
   }
@@ -131,9 +136,9 @@ export class VideoAddComponent extends FormReactive implements OnInit, OnDestroy
     const videofile = this.videofileInput.nativeElement.files[0] as File
     if (!videofile) return
 
-    // Cannot upload videos > 4GB for now
-    if (videofile.size > 4 * 1024 * 1024 * 1024) {
-      this.notificationsService.error(this.i18n('Error'), this.i18n('We are sorry but PeerTube cannot handle videos > 4GB'))
+    // Cannot upload videos > 8GB for now
+    if (videofile.size > 8 * 1024 * 1024 * 1024) {
+      this.notificationsService.error(this.i18n('Error'), this.i18n('We are sorry but PeerTube cannot handle videos > 8GB'))
       return
     }
 
@@ -159,11 +164,8 @@ export class VideoAddComponent extends FormReactive implements OnInit, OnDestroy
     let name: string
 
     // If the name of the file is very small, keep the extension
-    if (nameWithoutExtension.length < 3) {
-      name = videofile.name
-    } else {
-      name = nameWithoutExtension
-    }
+    if (nameWithoutExtension.length < 3) name = videofile.name
+    else name = nameWithoutExtension
 
     const privacy = this.firstStepPrivacyId.toString()
     const nsfw = false
@@ -225,22 +227,25 @@ export class VideoAddComponent extends FormReactive implements OnInit, OnDestroy
     this.isUpdatingVideo = true
     this.loadingBar.start()
     this.videoService.updateVideo(video)
-      .subscribe(
-        () => {
-          this.isUpdatingVideo = false
-          this.isUploadingVideo = false
-          this.loadingBar.complete()
+        .pipe(
+          // Then update captions
+          switchMap(() => this.videoCaptionService.updateCaptions(video.id, this.videoCaptions))
+        )
+        .subscribe(
+          () => {
+            this.isUpdatingVideo = false
+            this.isUploadingVideo = false
+            this.loadingBar.complete()
 
-          this.notificationsService.success(this.i18n('Success'), this.i18n('Video published.'))
-          this.router.navigate([ '/videos/watch', video.uuid ])
-        },
+            this.notificationsService.success(this.i18n('Success'), this.i18n('Video published.'))
+            this.router.navigate([ '/videos/watch', video.uuid ])
+          },
 
-        err => {
-          this.isUpdatingVideo = false
-          this.notificationsService.error(this.i18n('Error'), err.message)
-          console.error(err)
-        }
-      )
-
+          err => {
+            this.isUpdatingVideo = false
+            this.notificationsService.error(this.i18n('Error'), err.message)
+            console.error(err)
+          }
+        )
   }
 }

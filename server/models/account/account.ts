@@ -46,7 +46,19 @@ import { UserModel } from './user'
   ]
 })
 @Table({
-  tableName: 'account'
+  tableName: 'account',
+  indexes: [
+    {
+      fields: [ 'actorId' ],
+      unique: true
+    },
+    {
+      fields: [ 'applicationId' ]
+    },
+    {
+      fields: [ 'userId' ]
+    }
+  ]
 })
 export class AccountModel extends Model<AccountModel> {
 
@@ -127,7 +139,6 @@ export class AccountModel extends Model<AccountModel> {
     }
 
     if (instance.isOwned()) {
-      logger.debug('Sending delete of actor of account %s.', instance.Actor.url)
       return sendDeleteActor(instance.Actor, options.transaction)
     }
 

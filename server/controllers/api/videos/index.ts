@@ -2,7 +2,7 @@ import * as express from 'express'
 import { extname, join } from 'path'
 import { VideoCreate, VideoPrivacy, VideoState, VideoUpdate } from '../../../../shared'
 import { renamePromise } from '../../../helpers/core-utils'
-import { getVideoFileResolution } from '../../../helpers/ffmpeg-utils'
+import { getVideoFileFPS, getVideoFileResolution } from '../../../helpers/ffmpeg-utils'
 import { processImage } from '../../../helpers/image-utils'
 import { logger } from '../../../helpers/logger'
 import { getFormattedObjects, getServerActor, resetSequelizeInstance } from '../../../helpers/utils'
@@ -31,6 +31,7 @@ import {
   asyncMiddleware,
   asyncRetryTransactionMiddleware,
   authenticate,
+  commonVideosFiltersValidator,
   optionalAuthenticate,
   paginationValidator,
   setDefaultPagination,
@@ -38,7 +39,6 @@ import {
   videosAddValidator,
   videosGetValidator,
   videosRemoveValidator,
-  videosSearchValidator,
   videosSortValidator,
   videosUpdateValidator
 } from '../../../middlewares'
@@ -50,9 +50,9 @@ import { blacklistRouter } from './blacklist'
 import { videoCommentRouter } from './comment'
 import { rateVideoRouter } from './rate'
 import { VideoFilter } from '../../../../shared/models/videos/video-query.type'
-import { VideoSortField } from '../../../../client/src/app/shared/video/sort-field.type'
-import { createReqFiles, isNSFWHidden } from '../../../helpers/express-utils'
+import { createReqFiles, buildNSFWFilter } from '../../../helpers/express-utils'
 import { ScheduleVideoUpdateModel } from '../../../models/video/schedule-video-update'
+import { videoCaptionsRouter } from './captions'
 
 const videosRouter = express.Router()
 
@@ -78,6 +78,7 @@ videosRouter.use('/', abuseVideoRouter)
 videosRouter.use('/', blacklistRouter)
 videosRouter.use('/', rateVideoRouter)
 videosRouter.use('/', videoCommentRouter)
+videosRouter.use('/', videoCaptionsRouter)
 
 videosRouter.get('/categories', listVideoCategories)
 videosRouter.get('/licences', listVideoLicences)
@@ -90,16 +91,8 @@ videosRouter.get('/',
   setDefaultSort,
   setDefaultPagination,
   optionalAuthenticate,
+  commonVideosFiltersValidator,
   asyncMiddleware(listVideos)
-)
-videosRouter.get('/search',
-  videosSearchValidator,
-  paginationValidator,
-  videosSortValidator,
-  setDefaultSort,
-  setDefaultPagination,
-  optionalAuthenticate,
-  asyncMiddleware(searchVideos)
 )
 videosRouter.put('/:id',
   authenticate,
@@ -184,10 +177,13 @@ async function addVideo (req: express.Request, res: express.Response) {
 
   // Build the file object
   const { videoFileResolution } = await getVideoFileResolution(videoPhysicalFile.path)
+  const fps = await getVideoFileFPS(videoPhysicalFile.path)
+
   const videoFileData = {
     extname: extname(videoPhysicalFile.filename),
     resolution: videoFileResolution,
-    size: videoPhysicalFile.size
+    size: videoPhysicalFile.size,
+    fps
   }
   const videoFile = new VideoFileModel(videoFileData)
 
@@ -407,8 +403,12 @@ async function listVideos (req: express.Request, res: express.Response, next: ex
     start: req.query.start,
     count: req.query.count,
     sort: req.query.sort,
-    category: req.query.category,
-    hideNSFW: isNSFWHidden(res),
+    categoryOneOf: req.query.categoryOneOf,
+    licenceOneOf: req.query.licenceOneOf,
+    languageOneOf: req.query.languageOneOf,
+    tagsOneOf: req.query.tagsOneOf,
+    tagsAllOf: req.query.tagsAllOf,
+    nsfw: buildNSFWFilter(res, req.query.nsfw),
     filter: req.query.filter as VideoFilter,
     withFiles: false
   })
@@ -426,16 +426,4 @@ async function removeVideo (req: express.Request, res: express.Response) {
   logger.info('Video with name %s and uuid %s deleted.', videoInstance.name, videoInstance.uuid)
 
   return res.type('json').status(204).end()
-}
-
-async function searchVideos (req: express.Request, res: express.Response, next: express.NextFunction) {
-  const resultList = await VideoModel.searchAndPopulateAccountAndServer(
-    req.query.search as string,
-    req.query.start as number,
-    req.query.count as number,
-    req.query.sort as VideoSortField,
-    isNSFWHidden(res)
-  )
-
-  return res.json(getFormattedObjects(resultList.data, resultList.total))
 }

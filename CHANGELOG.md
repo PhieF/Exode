@@ -1,5 +1,119 @@
 # Changelog
 
+## v1.0.0-beta.10
+
+**See the v1.0.0-beta.10.pre.1 changelog, in particular how to upgrade**
+
+### Bug fixes (from beta.10.pre.3)
+
+ * Fix caption upload on Mac OS
+
+
+## v1.0.0-beta.10.pre.3
+
+**See the v1.0.0-beta.10.pre.1 changelog, in particular how to upgrade**
+
+### Bug fixes (from beta.10.pre.2)
+
+ * Try to fix the infinite creation of Delete actor jobs by deleting kue migration
+ * Cleanup SQL indexes
+ * Try to optimize SQL search query
+ * Try to optimize videos list SQL query
+ * Add more logs and fix logger when having an error
+ * Move subscription helper in the account line in video watch page
+ * Fix responsive on videos search
+ * Refresh orphan actors
+ * Don't send a follow request if the follow was already accepted 
+
+
+## v1.0.0-beta.10.pre.2
+
+**See the v1.0.0-beta.10.pre.1 changelog, in particular how to upgrade**
+
+### Bug fixes (from beta.10.pre.1)
+
+ * Fix captions/subtitles freeze in player
+ * Fix attribute label width in video watch page
+ * Fix player playback in Chrome
+ * Revert SQL optimization when listing videos: it breaks the connection pool of some instances
+
+
+## v1.0.0-beta.10.pre.1
+
+This version is a pre release because it contains many important changes, and requires manual steps before upgrading.
+
+**Important:** Before upgrading run the following commands (no need to stop PeerTube) on your PeerTube database (in this example it's *peertube_prod*):
+
+```
+$ sudo -u postgres psql peertube_prod -c 'CREATE EXTENSION IF NOT EXISTS unaccent;'
+$ sudo -u postgres psql peertube_prod -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'
+```
+
+You will need [PostgreSQL Contrib](https://www.postgresql.org/docs/9.6/static/contrib.html).
+  
+### BREAKING CHANGES
+
+ * Require `unaccent` and `pg_trgm` PostgreSQL extension for the PeerTube database
+ * `category` filter param is replaced by `categoryOneOf`
+ * Switch job queue to [Bull](https://github.com/OptimalBits/bull). **PeerTube will not migrate your old pending jobs in this new queue manager**
+ * Update nginx template (you need to [update manually](https://github.com/Chocobozzz/PeerTube/blob/develop/support/doc/production.md#nginx))
+ * Update default cache size configurations
+ * Update search API route: `/videos/search` becomes `/search/videos`
+ 
+### Features
+
+ * Add ability to change the language of the interface (currently available: english, french, basque, catalan, czech and esperanto)
+ * Subtitles/captions support (.srt and .vtt)
+ * Add advanced search
+ * Add ability to click on category/language/licence/tags in watch page
+ * Improve explanations of P2P & Privacy section in about page
+ * Avoid design latency when the admin set custom CSS
+ * Add ability to update video channel avatar
+ * Limit video resolution depending on the video element size (Nitesh Sawant)
+ * Show "Other videos" on a <1300px viewport ([@Simounet](https://github.com/simounet))
+ * Add QR code to share videos URL ([@DeeJayBro](https://github.com/DeeJayBro))
+ * Add "agree to the terms" checkbox in registration form
+ * Add tracker rate limiter
+ * Add author URL in OEmbed response
+ * Display username instead of email in menu
+ * Clarifying what extensions are accepted for upload ([@rigelk](https://github.com/rigelk))
+ * Thumbnail support for RSS feeds ([@rigelk](https://github.com/rigelk))
+ * Open CORS on API and static resources ([@rezonant](https://github.com/rezonant)
+ * B-adapt 1 and B-frames 16 on ffmpeg transcoding:  ([@Anton-Latukha](https://github.com/Anton-Latukha)). See https://github.com/Chocobozzz/PeerTube/pull/774 for more information
+ * Support Redis socket ([@rigelk](https://github.com/rigelk))
+ * Improve video `start` param to support string times (for example: 2m42s))
+ * Display table next/prev/first/last icons in admin tables
+ * NodeInfo support ([@rigelk](https://github.com/rigelk))
+ * Improve HTTP headers security ([@rigelk](https://github.com/rigelk))
+ * Improve client accessibility (for screen reader users etc)
+ * Optimize SQL requests (in particular the one to list videos)
+ * Optimize images ([@jorropo](https://github.com/jorropo))
+ * Add esperanto, lojban, klingon and kotava (audio/subtitle) languages
+ * Allow uploads of videos <8GB (*experimental*)
+ * Handle FPS > 30 (*experimental*)
+
+### Bug fixes
+
+ * Fix avatars/thumbnails update (cache issue)
+ * Fix pagination on admin job table when changing the job state
+ * Fix SQL transaction retryer log
+ * Correctly handle error when remote instance is down
+ * Fix account videos URL when scrolling
+ * Avoid commenting twice by disabling comment submit button when sending the comment
+ * Reset confirm component input when closing it
+ * Fix video speed when video resolutions changes ([@grizio](https://github.com/grizio))
+ * Disable hotkeys modifiers for numbers ([@rigelk](https://github.com/rigelk))
+ * Reset published date on video publish (scheduled or after a transcoding)
+ * Avoid 404 title on the first page load
+ * Fix forgot password message regarding email
+ * Remove scroll to top when closing the menu ([@ebrehault](https://github.com/ebrehault))
+ * Use UUID for channel link in watch page
+
+### Docker
+
+ * Add PEERTUBE_SMTP_DISABLE_STARTTLS config env
+ 
+
 ## v1.0.0-beta.9
 
 ### Features
@@ -10,7 +124,7 @@
  * Add time display to see where we seek the video
  * Add title in player peers info to show total downloaded/uploaded data
  * Provide magnet URI in player and download modal ([@rigelk](https://github.com/rigelk))
- * Add warning if the domain name is different from the from the first start of PeerTube
+ * Add warning if the domain name is different from the one of the first start of Peertube
  * Add resolution to create-transcoding-job script ([@fflorent](https://github.com/fflorent))
 
 ### Bug fixes

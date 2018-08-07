@@ -30,6 +30,12 @@ if [ "$branch" != "exode" ]; then
 fi
 
 version="v$1"
+github_prerelease_option=""
+if [[ "$version" = *".pre."* ]]; then
+  echo "This is a pre-release."
+  github_prerelease_option="--pre-release"
+fi
+
 directory_name="peertube-$version"
 zip_name="peertube-$version.zip"
 tar_name="peertube-$version.tar.xz"
@@ -76,7 +82,6 @@ git tag -a "$version" -m "$version"
 
   github-release release --user phief --repo exode --tag "$version" --name "$version" --description "$changelog"
   github-release upload --user phief --repo exode --tag "$version" --name "$zip_name" --file "$zip_name"
-
   git push origin exode
 
   # Update master branch

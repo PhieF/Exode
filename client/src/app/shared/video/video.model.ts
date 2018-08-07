@@ -1,7 +1,7 @@
 import { User } from '../'
 import { Video as VideoServerModel, VideoPrivacy, VideoState } from '../../../../../shared'
 import { Avatar } from '../../../../../shared/models/avatars/avatar.model'
-import { VideoConstant } from '../../../../../shared/models/videos/video.model'
+import { VideoConstant } from '../../../../../shared/models/videos/video-constant.model'
 import { getAbsoluteAPIUrl } from '../misc/utils'
 import { ServerConfig } from '../../../../../shared/models'
 import { Actor } from '@app/shared/actor/actor.model'
@@ -11,6 +11,7 @@ import { VideoScheduleUpdate } from '../../../../../shared/models/videos/video-s
 export class Video implements VideoServerModel {
   by: string
   accountAvatarUrl: string
+  videoChannelAvatarUrl: string
   createdAt: Date
   updatedAt: Date
   publishedAt: Date
@@ -102,9 +103,11 @@ export class Video implements VideoServerModel {
     this.dislikes = hash.dislikes
     this.nsfw = hash.nsfw
     this.account = hash.account
+    this.channel = hash.channel
 
     this.by = Actor.CREATE_BY_STRING(hash.account.name, hash.account.host)
     this.accountAvatarUrl = Actor.GET_ACTOR_AVATAR_URL(this.account)
+    this.videoChannelAvatarUrl = Actor.GET_ACTOR_AVATAR_URL(this.channel)
 
     this.category.label = peertubeTranslate(this.category.label, translations)
     this.licence.label = peertubeTranslate(this.licence.label, translations)

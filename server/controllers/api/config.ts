@@ -8,6 +8,7 @@ import { isSignupAllowed, isSignupAllowedForCurrentIP } from '../../helpers/util
 import { CONFIG, CONSTRAINTS_FIELDS, reloadConfig } from '../../initializers'
 import { asyncMiddleware, authenticate, ensureUserHasRight } from '../../middlewares'
 import { customConfigUpdateValidator } from '../../middlewares/validators/config'
+import { ClientHtml } from '../../lib/client-html'
 
 const packageJSON = require('../../../../package.json')
 const configRouter = express.Router()
@@ -80,6 +81,14 @@ async function getConfig (req: express.Request, res: express.Response, next: exp
         extensions: CONSTRAINTS_FIELDS.VIDEOS.EXTNAME
       }
     },
+    videoCaption: {
+      file: {
+        size: {
+          max: CONSTRAINTS_FIELDS.VIDEO_CAPTIONS.CAPTION_FILE.FILE_SIZE.max
+        },
+        extensions: CONSTRAINTS_FIELDS.VIDEO_CAPTIONS.CAPTION_FILE.EXTNAME
+      }
+    },
     user: {
       videoQuota: CONFIG.USER.VIDEO_QUOTA
     }
@@ -111,6 +120,7 @@ async function deleteCustomConfig (req: express.Request, res: express.Response, 
   await unlinkPromise(CONFIG.CUSTOM_FILE)
 
   reloadConfig()
+  ClientHtml.invalidCache()
 
   const data = customConfig()
 
@@ -122,12 +132,13 @@ async function updateCustomConfig (req: express.Request, res: express.Response, 
 
   // Force number conversion
   toUpdate.cache.previews.size = parseInt('' + toUpdate.cache.previews.size, 10)
+  toUpdate.cache.captions.size = parseInt('' + toUpdate.cache.captions.size, 10)
   toUpdate.signup.limit = parseInt('' + toUpdate.signup.limit, 10)
   toUpdate.user.videoQuota = parseInt('' + toUpdate.user.videoQuota, 10)
   toUpdate.transcoding.threads = parseInt('' + toUpdate.transcoding.threads, 10)
 
   // camelCase to snake_case key
-  const toUpdateJSON = omit(toUpdate, 'user.videoQuota', 'instance.defaultClientRoute', 'instance.shortDescription')
+  const toUpdateJSON = omit(toUpdate, 'user.videoQuota', 'instance.defaultClientRoute', 'instance.shortDescription', 'cache.videoCaptions')
   toUpdateJSON.user['video_quota'] = toUpdate.user.videoQuota
   toUpdateJSON.instance['default_client_route'] = toUpdate.instance.defaultClientRoute
   toUpdateJSON.instance['short_description'] = toUpdate.instance.shortDescription
@@ -136,6 +147,7 @@ async function updateCustomConfig (req: express.Request, res: express.Response, 
   await writeFilePromise(CONFIG.CUSTOM_FILE, JSON.stringify(toUpdateJSON, undefined, 2))
 
   reloadConfig()
+  ClientHtml.invalidCache()
 
   const data = customConfig()
   return res.json(data).end()
@@ -172,6 +184,9 @@ function customConfig (): CustomConfig {
     cache: {
       previews: {
         size: CONFIG.CACHE.PREVIEWS.SIZE
+      },
+      captions: {
+        size: CONFIG.CACHE.VIDEO_CAPTIONS.SIZE
       }
     },
     signup: {

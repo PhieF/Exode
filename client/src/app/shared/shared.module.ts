@@ -38,11 +38,19 @@ import { FormValidatorService } from '@app/shared/forms/form-validators/form-val
 import {
   CustomConfigValidatorsService,
   LoginValidatorsService,
+  ReactiveFileComponent,
   ResetPasswordValidatorsService,
-  UserValidatorsService, VideoAbuseValidatorsService, VideoChannelValidatorsService, VideoCommentValidatorsService, VideoValidatorsService
+  UserValidatorsService,
+  VideoAbuseValidatorsService,
+  VideoChannelValidatorsService,
+  VideoCommentValidatorsService,
+  VideoValidatorsService
 } from '@app/shared/forms'
 import { I18nPrimengCalendarService } from '@app/shared/i18n/i18n-primeng-calendar'
 import { ScreenService } from '@app/shared/misc/screen.service'
+import { VideoCaptionsValidatorsService } from '@app/shared/forms/form-validators/video-captions-validators.service'
+import { VideoCaptionService } from '@app/shared/video-caption'
+import { PeertubeCheckboxComponent } from '@app/shared/forms/peertube-checkbox.component'
 
 @NgModule({
   imports: [
@@ -74,7 +82,9 @@ import { ScreenService } from '@app/shared/misc/screen.service'
     FromNowPipe,
     MarkdownTextareaComponent,
     InfiniteScrollerDirective,
-    HelpComponent
+    HelpComponent,
+    ReactiveFileComponent,
+    PeertubeCheckboxComponent
   ],
 
   exports: [
@@ -102,6 +112,8 @@ import { ScreenService } from '@app/shared/misc/screen.service'
     MarkdownTextareaComponent,
     InfiniteScrollerDirective,
     HelpComponent,
+    ReactiveFileComponent,
+    PeertubeCheckboxComponent,
 
     NumberFormatterPipe,
     ObjectLengthPipe,
@@ -119,6 +131,7 @@ import { ScreenService } from '@app/shared/misc/screen.service'
     AccountService,
     MarkdownService,
     VideoChannelService,
+    VideoCaptionService,
 
     FormValidatorService,
     CustomConfigValidatorsService,
@@ -129,6 +142,7 @@ import { ScreenService } from '@app/shared/misc/screen.service'
     VideoChannelValidatorsService,
     VideoCommentValidatorsService,
     VideoValidatorsService,
+    VideoCaptionsValidatorsService,
 
     I18nPrimengCalendarService,
     ScreenService,

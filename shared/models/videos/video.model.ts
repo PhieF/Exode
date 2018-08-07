@@ -4,11 +4,7 @@ import { Avatar } from '../avatars/avatar.model'
 import { VideoChannel } from './video-channel.model'
 import { VideoPrivacy } from './video-privacy.enum'
 import { VideoScheduleUpdate } from './video-schedule-update.model'
-
-export interface VideoConstant <T> {
-  id: T
-  label: string
-}
+import { VideoConstant } from './video-constant.model'
 
 export interface VideoFile {
   magnetUri: string
@@ -18,6 +14,7 @@ export interface VideoFile {
   torrentDownloadUrl: string
   fileUrl: string
   fileDownloadUrl: string
+  fps: number
 }
 
 export interface Video {

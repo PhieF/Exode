@@ -14,15 +14,19 @@ let config: IConfig = require('config')
 
 // ---------------------------------------------------------------------------
 
-const LAST_MIGRATION_VERSION = 220
+const LAST_MIGRATION_VERSION = 240
 
 // ---------------------------------------------------------------------------
 
 // API version
 const API_VERSION = 'v1'
 
-// Number of results by default for the pagination
-const PAGINATION_COUNT_DEFAULT = 15
+const PAGINATION = {
+  COUNT: {
+    DEFAULT: 15,
+    MAX: 100
+  }
+}
 
 // Sortable columns per schema
 const SORTABLE_COLUMNS = {
@@ -35,7 +39,9 @@ const SORTABLE_COLUMNS = {
   VIDEO_COMMENT_THREADS: [ 'createdAt' ],
   BLACKLISTS: [ 'id', 'name', 'duration', 'views', 'likes', 'dislikes', 'uuid', 'createdAt' ],
   FOLLOWERS: [ 'createdAt' ],
-  FOLLOWING: [ 'createdAt' ]
+  FOLLOWING: [ 'createdAt' ],
+
+  VIDEOS_SEARCH: [ 'match', 'name', 'duration', 'createdAt', 'publishedAt', 'views', 'likes' ]
 }
 
 const OAUTH_LIFETIME = {
@@ -44,9 +50,11 @@ const OAUTH_LIFETIME = {
 }
 
 const ROUTE_CACHE_LIFETIME = {
-  FEEDS: 1000 * 60 * 15, // 15 minutes
+  FEEDS: '15 minutes',
+  ROBOTS: '2 hours',
+  NODEINFO: '10 minutes',
   ACTIVITY_PUB: {
-    VIDEOS: 1000 // 1 second, cache concurrent requests after a broadcast for example
+    VIDEOS: '1 second' // 1 second, cache concurrent requests after a broadcast for example
   }
 }
 
@@ -116,10 +124,11 @@ const CONFIG = {
     PASSWORD: config.get<string>('database.password')
   },
   REDIS: {
-    HOSTNAME: config.get<string>('redis.hostname'),
-    PORT: config.get<number>('redis.port'),
-    AUTH: config.get<string>('redis.auth'),
-    DB: config.get<number>('redis.db')
+    HOSTNAME: config.has('redis.hostname') ? config.get<string>('redis.hostname') : null,
+    PORT: config.has('redis.port') ? config.get<number>('redis.port') : null,
+    SOCKET: config.has('redis.socket') ? config.get<string>('redis.socket') : null,
+    AUTH: config.has('redis.auth') ? config.get<string>('redis.auth') : null,
+    DB: config.has('redis.db') ? config.get<number>('redis.db') : null
   },
   SMTP: {
     HOSTNAME: config.get<string>('smtp.hostname'),
@@ -137,6 +146,7 @@ const CONFIG = {
     VIDEOS_DIR: buildPath(config.get<string>('storage.videos')),
     THUMBNAILS_DIR: buildPath(config.get<string>('storage.thumbnails')),
     PREVIEWS_DIR: buildPath(config.get<string>('storage.previews')),
+    CAPTIONS_DIR: buildPath(config.get<string>('storage.captions')),
     TORRENTS_DIR: buildPath(config.get<string>('storage.torrents')),
     CACHE_DIR: buildPath(config.get<string>('storage.cache'))
   },
@@ -182,6 +192,9 @@ const CONFIG = {
   CACHE: {
     PREVIEWS: {
       get SIZE () { return config.get<number>('cache.previews.size') }
+    },
+    VIDEO_CAPTIONS: {
+      get SIZE () { return config.get<number>('cache.captions.size') }
     }
   },
   INSTANCE: {
@@ -223,6 +236,14 @@ const CONSTRAINTS_FIELDS = {
     DESCRIPTION: { min: 3, max: 500 }, // Length
     SUPPORT: { min: 3, max: 500 }, // Length
     URL: { min: 3, max: 2000 } // Length
+  },
+  VIDEO_CAPTIONS: {
+    CAPTION_FILE: {
+      EXTNAME: [ '.vtt', '.srt' ],
+      FILE_SIZE: {
+        max: 2 * 1024 * 1024 // 2MB
+      }
+    }
   },
   VIDEOS: {
     NAME: { min: 3, max: 120 }, // Length
@@ -282,7 +303,9 @@ const RATES_LIMIT = {
 let VIDEO_VIEW_LIFETIME = 60000 * 60 // 1 hour
 const VIDEO_TRANSCODING_FPS = {
   MIN: 10,
-  MAX: 30
+  AVERAGE: 30,
+  MAX: 60,
+  KEEP_ORIGIN_FPS_RESOLUTION_MIN: 720 // We keep the original FPS on high resolutions (720 minimum)
 }
 
 const VIDEO_RATE_TYPES: { [ id: string ]: VideoRateType } = {
@@ -348,6 +371,11 @@ const IMAGE_MIMETYPE_EXT = {
   'image/jpeg': '.jpg'
 }
 
+const VIDEO_CAPTIONS_MIMETYPE_EXT = {
+  'text/vtt': '.vtt',
+  'application/x-subrip': '.srt'
+}
+
 // ---------------------------------------------------------------------------
 
 const SERVER_ACTOR_NAME = 'peertube'
@@ -400,7 +428,8 @@ const STATIC_PATHS = {
   THUMBNAILS: '/static/thumbnails/',
   TORRENTS: '/static/torrents/',
   WEBSEED: '/static/webseed/',
-  AVATARS: '/static/avatars/'
+  AVATARS: '/static/avatars/',
+  VIDEO_CAPTIONS: '/static/video-captions/'
 }
 const STATIC_DOWNLOAD_PATHS = {
   TORRENTS: '/download/torrents/',
@@ -408,7 +437,7 @@ const STATIC_DOWNLOAD_PATHS = {
 }
 
 // Cache control
-let STATIC_MAX_AGE = '30d'
+let STATIC_MAX_AGE = '2h'
 
 // Videos thumbnail size
 const THUMBNAILS_SIZE = {
@@ -431,8 +460,13 @@ const EMBED_SIZE = {
 
 // Sub folders of cache directory
 const CACHE = {
-  DIRECTORIES: {
-    PREVIEWS: join(CONFIG.STORAGE.CACHE_DIR, 'previews')
+  PREVIEWS: {
+    DIRECTORY: join(CONFIG.STORAGE.CACHE_DIR, 'previews'),
+    MAX_AGE: 1000 * 3600 * 3 // 3 hours
+  },
+  VIDEO_CAPTIONS: {
+    DIRECTORY: join(CONFIG.STORAGE.CACHE_DIR, 'video-captions'),
+    MAX_AGE: 1000 * 3600 * 3 // 3 hours
   }
 }
 
@@ -440,12 +474,25 @@ const ACCEPT_HEADERS = [ 'html', 'application/json' ].concat(ACTIVITY_PUB.POTENT
 
 // ---------------------------------------------------------------------------
 
-const OPENGRAPH_AND_OEMBED_COMMENT = '<!-- open graph and oembed tags -->'
+const CUSTOM_HTML_TAG_COMMENTS = {
+  TITLE: '<!-- title tag -->',
+  DESCRIPTION: '<!-- description tag -->',
+  CUSTOM_CSS: '<!-- custom css tag -->',
+  OPENGRAPH_AND_OEMBED: '<!-- open graph and oembed tags -->'
+}
 
 // ---------------------------------------------------------------------------
 
 const FEEDS = {
   COUNT: 20
+}
+
+// ---------------------------------------------------------------------------
+
+const TRACKER_RATE_LIMITS = {
+  INTERVAL: 60000 * 5, // 5 minutes
+  ANNOUNCES_PER_IP_PER_INFOHASH: 15, // maximum announces per torrent in the interval
+  ANNOUNCES_PER_IP: 30 // maximum announces for all our torrents in the interval
 }
 
 // ---------------------------------------------------------------------------
@@ -471,6 +518,8 @@ if (isTestInstance() === true) {
   VIDEO_VIEW_LIFETIME = 1000 // 1 second
 
   JOB_ATTEMPTS['email'] = 1
+
+  CACHE.VIDEO_CAPTIONS.MAX_AGE = 3000
 }
 
 updateWebserverConfig()
@@ -479,9 +528,11 @@ updateWebserverConfig()
 
 export {
   API_VERSION,
+  VIDEO_CAPTIONS_MIMETYPE_EXT,
   AVATARS_SIZE,
   ACCEPT_HEADERS,
   BCRYPT_SALT_SIZE,
+  TRACKER_RATE_LIMITS,
   CACHE,
   CONFIG,
   CONSTRAINTS_FIELDS,
@@ -490,9 +541,9 @@ export {
   JOB_ATTEMPTS,
   LAST_MIGRATION_VERSION,
   OAUTH_LIFETIME,
-  OPENGRAPH_AND_OEMBED_COMMENT,
+  CUSTOM_HTML_TAG_COMMENTS,
   BROADCAST_CONCURRENCY,
-  PAGINATION_COUNT_DEFAULT,
+  PAGINATION,
   ACTOR_FOLLOW_SCORE,
   PREVIEWS_SIZE,
   REMOTE_SCHEME,
@@ -552,29 +603,34 @@ function buildLanguages () {
 
   const languages: { [ id: string ]: string } = {}
 
-  const signLanguages = [
-    'sgn', // Sign languages (macro language)
-    'ase', // American
-    'sdl', // Arabian
-    'bfi', // British
-    'bzs', // Brazilian
-    'csl', // Chinese
-    'cse', // Czech
-    'dsl', // Danish
-    'fsl', // French
-    'gsg', // German
-    'pks', // Pakistan
-    'jsl', // Japanese
-    'sfs', // South African
-    'swl', // Swedish
-    'rsl' // Russian
-  ]
+  const additionalLanguages = {
+    'sgn': true, // Sign languages (macro language)
+    'ase': true, // American sign language
+    'sdl': true, // Arabian sign language
+    'bfi': true, // British sign language
+    'bzs': true, // Brazilian sign language
+    'csl': true, // Chinese sign language
+    'cse': true, // Czech sign language
+    'dsl': true, // Danish sign language
+    'fsl': true, // French sign language
+    'gsg': true, // German sign language
+    'pks': true, // Pakistan sign language
+    'jsl': true, // Japanese sign language
+    'sfs': true, // South African sign language
+    'swl': true, // Swedish sign language
+    'rsl': true, // Russian sign language: true
+
+    'epo': true, // Esperanto
+    'tlh': true, // Klingon
+    'jbo': true, // Lojban
+    'avk': true // Kotava
+  }
 
   // Only add ISO639-1 languages and some sign languages (ISO639-3)
   iso639
     .filter(l => {
       return (l.iso6391 !== null && l.type === 'living') ||
-        signLanguages.indexOf(l.iso6393) !== -1
+        additionalLanguages[l.iso6393] === true
     })
     .forEach(l => languages[l.iso6391 || l.iso6393] = l.name)
 

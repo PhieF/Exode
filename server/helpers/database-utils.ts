@@ -1,6 +1,6 @@
 import * as retry from 'async/retry'
 import * as Bluebird from 'bluebird'
-import { Model } from 'sequelize-typescript'
+import { Model, Sequelize } from 'sequelize-typescript'
 import { logger } from './logger'
 
 function retryTransactionWrapper <T, A, B, C> (
@@ -35,7 +35,7 @@ function retryTransactionWrapper <T> (
         .catch(err => callback(err))
   })
   .catch(err => {
-    logger.error('Cannot execute %s with many retries.', functionToRetry.toString(), { err })
+    logger.error(`Cannot execute ${functionToRetry.name} with many retries.`, { err })
     throw err
   })
 }
