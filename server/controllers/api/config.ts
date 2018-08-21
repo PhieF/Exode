@@ -4,14 +4,17 @@ import { ServerConfig, UserRight } from '../../../shared'
 import { About } from '../../../shared/models/server/about.model'
 import { CustomConfig } from '../../../shared/models/server/custom-config.model'
 import { unlinkPromise, writeFilePromise } from '../../helpers/core-utils'
-import { isSignupAllowed, isSignupAllowedForCurrentIP } from '../../helpers/utils'
+import { isSignupAllowed, isSignupAllowedForCurrentIP } from '../../helpers/signup'
 import { CONFIG, CONSTRAINTS_FIELDS, reloadConfig } from '../../initializers'
 import { asyncMiddleware, authenticate, ensureUserHasRight } from '../../middlewares'
 import { customConfigUpdateValidator } from '../../middlewares/validators/config'
 import { ClientHtml } from '../../lib/client-html'
+import { auditLoggerFactory, CustomConfigAuditView } from '../../helpers/audit-logger'
 
 const packageJSON = require('../../../../package.json')
 const configRouter = express.Router()
+
+const auditLogger = auditLoggerFactory('config')
 
 configRouter.get('/about', getAbout)
 configRouter.get('/',
@@ -61,6 +64,16 @@ async function getConfig (req: express.Request, res: express.Response, next: exp
     },
     transcoding: {
       enabledResolutions
+    },
+    import: {
+      videos: {
+        http: {
+          enabled: CONFIG.IMPORT.VIDEOS.HTTP.ENABLED
+        },
+        torrent: {
+          enabled: CONFIG.IMPORT.VIDEOS.TORRENT.ENABLED
+        }
+      }
     },
     avatar: {
       file: {
@@ -119,6 +132,11 @@ async function getCustomConfig (req: express.Request, res: express.Response, nex
 async function deleteCustomConfig (req: express.Request, res: express.Response, next: express.NextFunction) {
   await unlinkPromise(CONFIG.CUSTOM_FILE)
 
+  auditLogger.delete(
+    res.locals.oauth.token.User.Account.Actor.getIdentifier(),
+    new CustomConfigAuditView(customConfig())
+  )
+
   reloadConfig()
   ClientHtml.invalidCache()
 
@@ -129,6 +147,7 @@ async function deleteCustomConfig (req: express.Request, res: express.Response, 
 
 async function updateCustomConfig (req: express.Request, res: express.Response, next: express.NextFunction) {
   const toUpdate: CustomConfig = req.body
+  const oldCustomConfigAuditKeys = new CustomConfigAuditView(customConfig())
 
   // Force number conversion
   toUpdate.cache.previews.size = parseInt('' + toUpdate.cache.previews.size, 10)
@@ -150,6 +169,13 @@ async function updateCustomConfig (req: express.Request, res: express.Response, 
   ClientHtml.invalidCache()
 
   const data = customConfig()
+
+  auditLogger.update(
+    res.locals.oauth.token.User.Account.Actor.getIdentifier(),
+    new CustomConfigAuditView(data),
+    oldCustomConfigAuditKeys
+  )
+
   return res.json(data).end()
 }
 
@@ -208,6 +234,16 @@ function customConfig (): CustomConfig {
         '480p': CONFIG.TRANSCODING.RESOLUTIONS[ '480p' ],
         '720p': CONFIG.TRANSCODING.RESOLUTIONS[ '720p' ],
         '1080p': CONFIG.TRANSCODING.RESOLUTIONS[ '1080p' ]
+      }
+    },
+    import: {
+      videos: {
+        http: {
+          enabled: CONFIG.IMPORT.VIDEOS.HTTP.ENABLED
+        },
+        torrent: {
+          enabled: CONFIG.IMPORT.VIDEOS.TORRENT.ENABLED
+        }
       }
     }
   }

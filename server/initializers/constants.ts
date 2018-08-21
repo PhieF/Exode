@@ -3,7 +3,7 @@ import { dirname, join } from 'path'
 import { JobType, VideoRateType, VideoState } from '../../shared/models'
 import { ActivityPubActorType } from '../../shared/models/activitypub'
 import { FollowState } from '../../shared/models/actors'
-import { VideoPrivacy } from '../../shared/models/videos'
+import { VideoPrivacy, VideoAbuseState, VideoImportState } from '../../shared/models/videos'
 // Do not use barrels, remain constants as independent as possible
 import { buildPath, isTestInstance, root, sanitizeHost, sanitizeUrl } from '../helpers/core-utils'
 import { NSFWPolicyType } from '../../shared/models/videos/nsfw-policy.type'
@@ -14,7 +14,7 @@ let config: IConfig = require('config')
 
 // ---------------------------------------------------------------------------
 
-const LAST_MIGRATION_VERSION = 240
+const LAST_MIGRATION_VERSION = 255
 
 // ---------------------------------------------------------------------------
 
@@ -33,9 +33,10 @@ const SORTABLE_COLUMNS = {
   USERS: [ 'id', 'username', 'createdAt' ],
   ACCOUNTS: [ 'createdAt' ],
   JOBS: [ 'createdAt' ],
-  VIDEO_ABUSES: [ 'id', 'createdAt' ],
+  VIDEO_ABUSES: [ 'id', 'createdAt', 'state' ],
   VIDEO_CHANNELS: [ 'id', 'name', 'updatedAt', 'createdAt' ],
   VIDEOS: [ 'name', 'duration', 'createdAt', 'publishedAt', 'views', 'likes' ],
+  VIDEO_IMPORTS: [ 'createdAt' ],
   VIDEO_COMMENT_THREADS: [ 'createdAt' ],
   BLACKLISTS: [ 'id', 'name', 'duration', 'views', 'likes', 'dislikes', 'uuid', 'createdAt' ],
   FOLLOWERS: [ 'createdAt' ],
@@ -53,6 +54,7 @@ const ROUTE_CACHE_LIFETIME = {
   FEEDS: '15 minutes',
   ROBOTS: '2 hours',
   NODEINFO: '10 minutes',
+  DNT_POLICY: '1 week',
   ACTIVITY_PUB: {
     VIDEOS: '1 second' // 1 second, cache concurrent requests after a broadcast for example
   }
@@ -85,6 +87,7 @@ const JOB_ATTEMPTS: { [ id in JobType ]: number } = {
   'activitypub-follow': 5,
   'video-file-import': 1,
   'video-file': 1,
+  'video-import': 1,
   'email': 5
 }
 const JOB_CONCURRENCY: { [ id in JobType ]: number } = {
@@ -94,18 +97,29 @@ const JOB_CONCURRENCY: { [ id in JobType ]: number } = {
   'activitypub-follow': 3,
   'video-file-import': 1,
   'video-file': 1,
+  'video-import': 1,
   'email': 5
+}
+const JOB_TTL: { [ id in JobType ]: number } = {
+  'activitypub-http-broadcast': 60000 * 10, // 10 minutes
+  'activitypub-http-unicast': 60000 * 10, // 10 minutes
+  'activitypub-http-fetcher': 60000 * 10, // 10 minutes
+  'activitypub-follow': 60000 * 10, // 10 minutes
+  'video-file-import': 1000 * 3600, // 1 hour
+  'video-file': 1000 * 3600 * 48, // 2 days, transcoding could be long
+  'video-import': 1000 * 3600 * 5, // 5 hours
+  'email': 60000 * 10 // 10 minutes
 }
 const BROADCAST_CONCURRENCY = 10 // How many requests in parallel we do in activitypub-http-broadcast job
 const JOB_REQUEST_TIMEOUT = 3000 // 3 seconds
-const JOB_REQUEST_TTL = 60000 * 10 // 10 minutes
 const JOB_COMPLETED_LIFETIME = 60000 * 60 * 24 * 2 // 2 days
 
 // 1 hour
 let SCHEDULER_INTERVALS_MS = {
   badActorFollow: 60000 * 60, // 1 hour
   removeOldJobs: 60000 * 60, // 1 hour
-  updateVideos: 60000 // 1 minute
+  updateVideos: 60000, // 1 minute
+  youtubeDLUpdate: 60000 * 60 * 24 // 1 day
 }
 
 // ---------------------------------------------------------------------------
@@ -121,7 +135,10 @@ const CONFIG = {
     HOSTNAME: config.get<string>('database.hostname'),
     PORT: config.get<number>('database.port'),
     USERNAME: config.get<string>('database.username'),
-    PASSWORD: config.get<string>('database.password')
+    PASSWORD: config.get<string>('database.password'),
+    POOL: {
+      MAX: config.get<number>('database.pool.max')
+    }
   },
   REDIS: {
     HOSTNAME: config.has('redis.hostname') ? config.get<string>('redis.hostname') : null,
@@ -189,6 +206,16 @@ const CONFIG = {
       get '1080p' () { return config.get<boolean>('transcoding.resolutions.1080p') }
     }
   },
+  IMPORT: {
+    VIDEOS: {
+      HTTP: {
+        get ENABLED () { return config.get<boolean>('import.videos.http.enabled') }
+      },
+      TORRENT: {
+        get ENABLED () { return config.get<boolean>('import.videos.torrent.enabled') }
+      }
+    }
+  },
   CACHE: {
     PREVIEWS: {
       get SIZE () { return config.get<number>('cache.previews.size') }
@@ -226,9 +253,14 @@ const CONSTRAINTS_FIELDS = {
     DESCRIPTION: { min: 3, max: 250 }, // Length
     USERNAME: { min: 3, max: 20 }, // Length
     PASSWORD: { min: 6, max: 255 }, // Length
-    VIDEO_QUOTA: { min: -1 }
+    VIDEO_QUOTA: { min: -1 },
+    BLOCKED_REASON: { min: 3, max: 250 } // Length
   },
   VIDEO_ABUSES: {
+    REASON: { min: 2, max: 300 }, // Length
+    MODERATION_COMMENT: { min: 2, max: 300 } // Length
+  },
+  VIDEO_BLACKLIST: {
     REASON: { min: 2, max: 300 } // Length
   },
   VIDEO_CHANNELS: {
@@ -242,6 +274,16 @@ const CONSTRAINTS_FIELDS = {
       EXTNAME: [ '.vtt', '.srt' ],
       FILE_SIZE: {
         max: 2 * 1024 * 1024 // 2MB
+      }
+    }
+  },
+  VIDEO_IMPORTS: {
+    URL: { min: 3, max: 2000 }, // Length
+    TORRENT_NAME: { min: 3, max: 255 }, // Length
+    TORRENT_FILE: {
+      EXTNAME: [ '.torrent' ],
+      FILE_SIZE: {
+        max: 1024 * 200 // 200 KB
       }
     }
   },
@@ -259,7 +301,7 @@ const CONSTRAINTS_FIELDS = {
     },
     EXTNAME: [ '.mp4', '.ogv', '.webm' ],
     INFO_HASH: { min: 40, max: 40 }, // Length, info hash is 20 bytes length but we represent it in hexadecimal so 20 * 2
-    DURATION: { min: 1 }, // Number
+    DURATION: { min: 0 }, // Number
     TAGS: { min: 0, max: 5 }, // Number of total tags
     TAG: { min: 2, max: 30 }, // Length
     THUMBNAIL: { min: 2, max: 30 },
@@ -313,6 +355,11 @@ const VIDEO_RATE_TYPES: { [ id: string ]: VideoRateType } = {
   DISLIKE: 'dislike'
 }
 
+const FFMPEG_NICE: { [ id: string ]: number } = {
+  THUMBNAIL: 2, // 2 just for don't blocking servers
+  TRANSCODING: 15
+}
+
 const VIDEO_CATEGORIES = {
   1: 'Music',
   2: 'Films',
@@ -355,7 +402,20 @@ const VIDEO_PRIVACIES = {
 
 const VIDEO_STATES = {
   [VideoState.PUBLISHED]: 'Published',
-  [VideoState.TO_TRANSCODE]: 'To transcode'
+  [VideoState.TO_TRANSCODE]: 'To transcode',
+  [VideoState.TO_IMPORT]: 'To import'
+}
+
+const VIDEO_IMPORT_STATES = {
+  [VideoImportState.FAILED]: 'Failed',
+  [VideoImportState.PENDING]: 'Pending',
+  [VideoImportState.SUCCESS]: 'Success'
+}
+
+const VIDEO_ABUSE_STATES = {
+  [VideoAbuseState.PENDING]: 'Pending',
+  [VideoAbuseState.REJECTED]: 'Rejected',
+  [VideoAbuseState.ACCEPTED]: 'Accepted'
 }
 
 const VIDEO_MIMETYPE_EXT = {
@@ -374,6 +434,10 @@ const IMAGE_MIMETYPE_EXT = {
 const VIDEO_CAPTIONS_MIMETYPE_EXT = {
   'text/vtt': '.vtt',
   'application/x-subrip': '.srt'
+}
+
+const TORRENT_MIMETYPE_EXT = {
+  'application/x-bittorrent': '.torrent'
 }
 
 // ---------------------------------------------------------------------------
@@ -553,7 +617,9 @@ export {
   ROUTE_CACHE_LIFETIME,
   SORTABLE_COLUMNS,
   FEEDS,
+  JOB_TTL,
   NSFW_POLICY_TYPES,
+  TORRENT_MIMETYPE_EXT,
   STATIC_MAX_AGE,
   STATIC_PATHS,
   ACTIVITY_PUB,
@@ -567,8 +633,9 @@ export {
   VIDEO_RATE_TYPES,
   VIDEO_MIMETYPE_EXT,
   VIDEO_TRANSCODING_FPS,
+  FFMPEG_NICE,
+  VIDEO_ABUSE_STATES,
   JOB_REQUEST_TIMEOUT,
-  JOB_REQUEST_TTL,
   USER_PASSWORD_RESET_LIFETIME,
   IMAGE_MIMETYPE_EXT,
   SCHEDULER_INTERVALS_MS,
@@ -576,6 +643,7 @@ export {
   RATES_LIMIT,
   VIDEO_EXT_MIMETYPE,
   JOB_COMPLETED_LIFETIME,
+  VIDEO_IMPORT_STATES,
   VIDEO_VIEW_LIFETIME,
   buildLanguages
 }

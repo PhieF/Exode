@@ -5,7 +5,8 @@ import { renamePromise } from '../../../helpers/core-utils'
 import { getVideoFileFPS, getVideoFileResolution } from '../../../helpers/ffmpeg-utils'
 import { processImage } from '../../../helpers/image-utils'
 import { logger } from '../../../helpers/logger'
-import { getFormattedObjects, getServerActor, resetSequelizeInstance } from '../../../helpers/utils'
+import { auditLoggerFactory, VideoAuditView } from '../../../helpers/audit-logger'
+import { getFormattedObjects, getServerActor } from '../../../helpers/utils'
 import {
   CONFIG,
   IMAGE_MIMETYPE_EXT,
@@ -50,10 +51,13 @@ import { blacklistRouter } from './blacklist'
 import { videoCommentRouter } from './comment'
 import { rateVideoRouter } from './rate'
 import { VideoFilter } from '../../../../shared/models/videos/video-query.type'
-import { createReqFiles, buildNSFWFilter } from '../../../helpers/express-utils'
+import { buildNSFWFilter, createReqFiles } from '../../../helpers/express-utils'
 import { ScheduleVideoUpdateModel } from '../../../models/video/schedule-video-update'
 import { videoCaptionsRouter } from './captions'
+import { videoImportsRouter } from './import'
+import { resetSequelizeInstance } from '../../../helpers/database-utils'
 
+const auditLogger = auditLoggerFactory('videos')
 const videosRouter = express.Router()
 
 const reqVideoFileAdd = createReqFiles(
@@ -79,6 +83,7 @@ videosRouter.use('/', blacklistRouter)
 videosRouter.use('/', rateVideoRouter)
 videosRouter.use('/', videoCommentRouter)
 videosRouter.use('/', videoCaptionsRouter)
+videosRouter.use('/', videoImportsRouter)
 
 videosRouter.get('/categories', listVideoCategories)
 videosRouter.get('/licences', listVideoLicences)
@@ -158,7 +163,6 @@ async function addVideo (req: express.Request, res: express.Response) {
   const videoData = {
     name: videoInfo.name,
     remote: false,
-    extname: extname(videoPhysicalFile.filename),
     category: videoInfo.category,
     licence: videoInfo.licence,
     language: videoInfo.language,
@@ -247,6 +251,7 @@ async function addVideo (req: express.Request, res: express.Response) {
 
     await federateVideoIfNeeded(video, true, t)
 
+    auditLogger.create(res.locals.oauth.token.User.Account.Actor.getIdentifier(), new VideoAuditView(videoCreated.toFormattedDetailsJSON()))
     logger.info('Video with name %s and uuid %s created.', videoInfo.name, videoCreated.uuid)
 
     return videoCreated
@@ -273,6 +278,7 @@ async function addVideo (req: express.Request, res: express.Response) {
 async function updateVideo (req: express.Request, res: express.Response) {
   const videoInstance: VideoModel = res.locals.video
   const videoFieldsSave = videoInstance.toJSON()
+  const oldVideoAuditView = new VideoAuditView(videoInstance.toFormattedDetailsJSON())
   const videoInfoToUpdate: VideoUpdate = req.body
   const wasPrivateVideo = videoInstance.privacy === VideoPrivacy.PRIVATE
 
@@ -344,9 +350,14 @@ async function updateVideo (req: express.Request, res: express.Response) {
 
       const isNewVideo = wasPrivateVideo && videoInstanceUpdated.privacy !== VideoPrivacy.PRIVATE
       await federateVideoIfNeeded(videoInstanceUpdated, isNewVideo, t)
-    })
 
-    logger.info('Video with name %s and uuid %s updated.', videoInstance.name, videoInstance.uuid)
+      auditLogger.update(
+        res.locals.oauth.token.User.Account.Actor.getIdentifier(),
+        new VideoAuditView(videoInstanceUpdated.toFormattedDetailsJSON()),
+        oldVideoAuditView
+      )
+      logger.info('Video with name %s and uuid %s updated.', videoInstance.name, videoInstance.uuid)
+    })
   } catch (err) {
     // Force fields we want to update
     // If the transaction is retried, sequelize will think the object has not changed
@@ -423,6 +434,7 @@ async function removeVideo (req: express.Request, res: express.Response) {
     await videoInstance.destroy({ transaction: t })
   })
 
+  auditLogger.delete(res.locals.oauth.token.User.Account.Actor.getIdentifier(), new VideoAuditView(videoInstance.toFormattedDetailsJSON()))
   logger.info('Video with name %s and uuid %s deleted.', videoInstance.name, videoInstance.uuid)
 
   return res.type('json').status(204).end()

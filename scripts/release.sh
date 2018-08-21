@@ -24,8 +24,13 @@ if [ -z "$GITHUB_TOKEN" ]; then
 fi
 
 branch=$(git symbolic-ref --short -q HEAD)
+<<<<<<< HEAD
 if [ "$branch" != "exode" ]; then
   echo "Need to be on develop branch."
+=======
+if [ "$branch" != "develop" ] && [[ "$branch" != feature/* ]]; then
+  echo "Need to be on develop or release branch."
+>>>>>>> peertube/master
   exit -1
 fi
 

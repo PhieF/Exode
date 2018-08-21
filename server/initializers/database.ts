@@ -24,6 +24,7 @@ import { VideoTagModel } from '../models/video/video-tag'
 import { CONFIG } from './constants'
 import { ScheduleVideoUpdateModel } from '../models/video/schedule-video-update'
 import { VideoCaptionModel } from '../models/video/video-caption'
+import { VideoImportModel } from '../models/video/video-import'
 
 require('pg').defaults.parseInt8 = true // Avoid BIGINT to be converted to string
 
@@ -32,6 +33,7 @@ const username = CONFIG.DATABASE.USERNAME
 const password = CONFIG.DATABASE.PASSWORD
 const host = CONFIG.DATABASE.HOSTNAME
 const port = CONFIG.DATABASE.PORT
+const poolMax = CONFIG.DATABASE.POOL.MAX
 
 const sequelizeTypescript = new SequelizeTypescript({
   database: dbname,
@@ -40,6 +42,9 @@ const sequelizeTypescript = new SequelizeTypescript({
   port,
   username,
   password,
+  pool: {
+    max: poolMax
+  },
   benchmark: isTestInstance(),
   isolationLevel: SequelizeTypescript.Transaction.ISOLATION_LEVELS.SERIALIZABLE,
   operatorsAliases: false,
@@ -77,7 +82,8 @@ async function initDatabaseModels (silent: boolean) {
     VideoTagModel,
     VideoModel,
     VideoCommentModel,
-    ScheduleVideoUpdateModel
+    ScheduleVideoUpdateModel,
+    VideoImportModel
   ])
 
   // Check extensions exist in the database

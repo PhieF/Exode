@@ -14,7 +14,6 @@ import {
 import {
   checkUserCanManageVideo,
   isScheduleVideoUpdatePrivacyValid,
-  isVideoAbuseReasonValid,
   isVideoCategoryValid,
   isVideoChannelOfAccountExist,
   isVideoDescriptionValid,
@@ -35,6 +34,9 @@ import { CONSTRAINTS_FIELDS } from '../../initializers'
 import { VideoShareModel } from '../../models/video/video-share'
 import { authenticate } from '../oauth'
 import { areValidationErrors } from './utils'
+import { cleanUpReqFiles } from '../../helpers/express-utils'
+import { VideoModel } from '../../models/video/video'
+import { UserModel } from '../../models/account/user'
 
 const videosAddValidator = getCommonVideoAttributes().concat([
   body('videofile')
@@ -50,13 +52,13 @@ const videosAddValidator = getCommonVideoAttributes().concat([
   async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     logger.debug('Checking videosAdd parameters', { parameters: req.body, files: req.files })
 
-    if (areValidationErrors(req, res)) return
-    if (areErrorsInScheduleUpdate(req, res)) return
+    if (areValidationErrors(req, res)) return cleanUpReqFiles(req)
+    if (areErrorsInScheduleUpdate(req, res)) return cleanUpReqFiles(req)
 
     const videoFile: Express.Multer.File = req.files['videofile'][0]
     const user = res.locals.oauth.token.User
 
-    if (!await isVideoChannelOfAccountExist(req.body.channelId, user, res)) return
+    if (!await isVideoChannelOfAccountExist(req.body.channelId, user, res)) return cleanUpReqFiles(req)
 
     const isAble = await user.isAbleToUploadVideo(videoFile)
     if (isAble === false) {
@@ -64,7 +66,7 @@ const videosAddValidator = getCommonVideoAttributes().concat([
          .json({ error: 'The user video quota is exceeded with this video.' })
          .end()
 
-      return
+      return cleanUpReqFiles(req)
     }
 
     let duration: number
@@ -77,7 +79,7 @@ const videosAddValidator = getCommonVideoAttributes().concat([
          .json({ error: 'Invalid input file.' })
          .end()
 
-      return
+      return cleanUpReqFiles(req)
     }
 
     videoFile['duration'] = duration
@@ -99,23 +101,24 @@ const videosUpdateValidator = getCommonVideoAttributes().concat([
   async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     logger.debug('Checking videosUpdate parameters', { parameters: req.body })
 
-    if (areValidationErrors(req, res)) return
-    if (areErrorsInScheduleUpdate(req, res)) return
-    if (!await isVideoExist(req.params.id, res)) return
+    if (areValidationErrors(req, res)) return cleanUpReqFiles(req)
+    if (areErrorsInScheduleUpdate(req, res)) return cleanUpReqFiles(req)
+    if (!await isVideoExist(req.params.id, res)) return cleanUpReqFiles(req)
 
     const video = res.locals.video
 
     // Check if the user who did the request is able to update the video
     const user = res.locals.oauth.token.User
-    if (!checkUserCanManageVideo(user, res.locals.video, UserRight.UPDATE_ANY_VIDEO, res)) return
+    if (!checkUserCanManageVideo(user, res.locals.video, UserRight.UPDATE_ANY_VIDEO, res)) return cleanUpReqFiles(req)
 
     if (video.privacy !== VideoPrivacy.PRIVATE && req.body.privacy === VideoPrivacy.PRIVATE) {
+      cleanUpReqFiles(req)
       return res.status(409)
         .json({ error: 'Cannot set "private" a video that was not private.' })
         .end()
     }
 
-    if (req.body.channelId && !await isVideoChannelOfAccountExist(req.body.channelId, user, res)) return
+    if (req.body.channelId && !await isVideoChannelOfAccountExist(req.body.channelId, user, res)) return cleanUpReqFiles(req)
 
     return next()
   }
@@ -130,7 +133,25 @@ const videosGetValidator = [
     if (areValidationErrors(req, res)) return
     if (!await isVideoExist(req.params.id, res)) return
 
-    const video = res.locals.video
+    const video: VideoModel = res.locals.video
+
+    // Video private or blacklisted
+    if (video.privacy === VideoPrivacy.PRIVATE || video.VideoBlacklist) {
+      authenticate(req, res, () => {
+        const user: UserModel = res.locals.oauth.token.User
+
+        // Only the owner or a user that have blacklist rights can see the video
+        if (video.VideoChannel.Account.userId !== user.id && !user.hasRight(UserRight.MANAGE_VIDEO_BLACKLIST)) {
+          return res.status(403)
+                    .json({ error: 'Cannot get this private or blacklisted video.' })
+                    .end()
+        }
+
+        return next()
+      })
+
+      return
+    }
 
     // Video is public, anyone can access it
     if (video.privacy === VideoPrivacy.PUBLIC) return next()
@@ -142,17 +163,6 @@ const videosGetValidator = [
       // Don't leak this unlisted video
       return res.status(404).end()
     }
-
-    // Video is private, check the user
-    authenticate(req, res, () => {
-      if (video.VideoChannel.Account.userId !== res.locals.oauth.token.User.id) {
-        return res.status(403)
-          .json({ error: 'Cannot get this private video of another user' })
-          .end()
-      }
-
-      return next()
-    })
   }
 ]
 
@@ -167,20 +177,6 @@ const videosRemoveValidator = [
 
     // Check if the user who did the request is able to delete the video
     if (!checkUserCanManageVideo(res.locals.oauth.token.User, res.locals.video, UserRight.REMOVE_ANY_VIDEO, res)) return
-
-    return next()
-  }
-]
-
-const videoAbuseReportValidator = [
-  param('id').custom(isIdOrUUIDValid).not().isEmpty().withMessage('Should have a valid id'),
-  body('reason').custom(isVideoAbuseReasonValid).withMessage('Should have a valid reason'),
-
-  async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    logger.debug('Checking videoAbuseReport parameters', { parameters: req.body })
-
-    if (areValidationErrors(req, res)) return
-    if (!await isVideoExist(req.params.id, res)) return
 
     return next()
   }
@@ -220,36 +216,6 @@ const videosShareValidator = [
     return next()
   }
 ]
-
-// ---------------------------------------------------------------------------
-
-export {
-  videosAddValidator,
-  videosUpdateValidator,
-  videosGetValidator,
-  videosRemoveValidator,
-  videosShareValidator,
-
-  videoAbuseReportValidator,
-
-  videoRateValidator
-}
-
-// ---------------------------------------------------------------------------
-
-function areErrorsInScheduleUpdate (req: express.Request, res: express.Response) {
-  if (req.body.scheduleUpdate) {
-    if (!req.body.scheduleUpdate.updateAt) {
-      res.status(400)
-         .json({ error: 'Schedule update at is mandatory.' })
-         .end()
-
-      return true
-    }
-  }
-
-  return false
-}
 
 function getCommonVideoAttributes () {
   return [
@@ -316,4 +282,34 @@ function getCommonVideoAttributes () {
       .toInt()
       .custom(isScheduleVideoUpdatePrivacyValid).withMessage('Should have correct schedule update privacy')
   ] as (ValidationChain | express.Handler)[]
+}
+
+// ---------------------------------------------------------------------------
+
+export {
+  videosAddValidator,
+  videosUpdateValidator,
+  videosGetValidator,
+  videosRemoveValidator,
+  videosShareValidator,
+
+  videoRateValidator,
+
+  getCommonVideoAttributes
+}
+
+// ---------------------------------------------------------------------------
+
+function areErrorsInScheduleUpdate (req: express.Request, res: express.Response) {
+  if (req.body.scheduleUpdate) {
+    if (!req.body.scheduleUpdate.updateAt) {
+      res.status(400)
+         .json({ error: 'Schedule update at is mandatory.' })
+         .end()
+
+      return true
+    }
+  }
+
+  return false
 }

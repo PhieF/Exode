@@ -1,3 +1,4 @@
+import { TableModule } from 'primeng/table'
 import { NgModule } from '@angular/core'
 import { SharedModule } from '../shared'
 import { MyAccountRoutingModule } from './my-account-routing.module'
@@ -11,11 +12,14 @@ import { MyAccountVideoChannelsComponent } from '@app/+my-account/my-account-vid
 import { MyAccountVideoChannelCreateComponent } from '@app/+my-account/my-account-video-channels/my-account-video-channel-create.component'
 import { MyAccountVideoChannelUpdateComponent } from '@app/+my-account/my-account-video-channels/my-account-video-channel-update.component'
 import { ActorAvatarInfoComponent } from '@app/+my-account/shared/actor-avatar-info.component'
+import { MyAccountVideoImportsComponent } from '@app/+my-account/my-account-video-imports/my-account-video-imports.component'
+import { MyAccountDangerZoneComponent } from '@app/+my-account/my-account-settings/my-account-danger-zone'
 
 @NgModule({
   imports: [
     MyAccountRoutingModule,
-    SharedModule
+    SharedModule,
+    TableModule
   ],
 
   declarations: [
@@ -28,7 +32,9 @@ import { ActorAvatarInfoComponent } from '@app/+my-account/shared/actor-avatar-i
     MyAccountVideoChannelsComponent,
     MyAccountVideoChannelCreateComponent,
     MyAccountVideoChannelUpdateComponent,
-    ActorAvatarInfoComponent
+    ActorAvatarInfoComponent,
+    MyAccountVideoImportsComponent,
+    MyAccountDangerZoneComponent
   ],
 
   exports: [
