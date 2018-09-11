@@ -4,6 +4,7 @@
    - [import-videos.js](#import-videosjs)
    - [upload.js](#uploadjs)
  - [Server tools](#server-tools)
+   - [parse-log](#parse-log)
    - [create-transcoding-job.js](#create-transcoding-jobjs)
    - [create-import-video-file-job.js](#create-import-video-file-jobjs)
    - [prune-storage.js](#prune-storagejs)
@@ -12,7 +13,7 @@
 
 You need at least 512MB RAM to run the script.
 Scripts can be launched directly from a PeerTube server, or from a separate server, even a desktop PC.
-You need to follow all the following steps even if you are on a PeerTube server.
+You need to follow all the following steps even if you are on a PeerTube server (including cloning the git repository in a different directory than your production installation).
 
 ### Dependencies
 
@@ -84,6 +85,16 @@ $ node dist/server/tools/upload.js --help
 ## Server tools
 
 These scripts should be run on the server, in `peertube-latest` directory.
+
+### parse-log
+
+To parse PeerTube last log file:
+
+```
+$ sudo -u peertube NODE_CONFIG_DIR=/var/www/peertube/config NODE_ENV=production npm run parse-log -- --level info
+```
+
+`--level` is optional and could be `info`/`warn`/`error`
 
 ### create-transcoding-job.js
 

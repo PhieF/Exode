@@ -6,21 +6,25 @@
   height: calc(100vh - #{$header-height});
   padding: 0;
   width: $menu-width;
+  z-index: 10000;
 }
 
 menu {
-  background-color: $black-background;
+  background-color: $menu-background;
   margin: 0;
   padding: 0;
   height: 100%;
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  z-index: 1000;
   color: $menu-color;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
+  width: 100%;
+
+  &:focus, &:hover {
+    overflow-y: auto;
+  }
 
   .top-menu {
     flex-grow: 1;
@@ -118,7 +122,7 @@ menu {
     a {
       display: flex;
       align-items: center;
-      padding-left: $menu-left-padding;
+      padding-left: $menu-lateral-padding;
       color: $menu-color;
       cursor: pointer;
       height: 40px;
@@ -135,25 +139,36 @@ menu {
 
         margin-right: 18px;
 
+        &.icon-videos-subscriptions {
+          position: relative;
+          top: -1px;
+          background-image: url('../../assets/images/menu/subscriptions.svg');
+        }
+
+        &.icon-videos-overview {
+          position: relative;
+          background-image: url('../../assets/images/menu/globe.svg');
+        }
+
         &.icon-videos-trending {
           position: relative;
-          top: -2px;
+          top: -1px;
           background-image: url('../../assets/images/menu/trending.svg');
         }
 
         &.icon-videos-recently-added {
           width: 23px;
           height: 23px;
-          position: relative;
-          top: -1px;
           background-image: url('../../assets/images/menu/recently-added.svg');
         }
 
         &.icon-videos-local {
           width: 23px;
           height: 23px;
+
           position: relative;
           top: -1px;
+
           background-image: url('../../assets/images/menu/home.svg');
         }
 
@@ -175,10 +190,11 @@ menu {
   }
 
   .footer {
-    margin-bottom: 15px;
-    padding-left: $menu-left-padding;
+    padding-bottom: 15px;
+    padding-left: $menu-lateral-padding;
+    padding-right: $menu-lateral-padding;
 
-    .language {
+    .language, .color-palette {
       display: inline-block;
       color: $menu-bottom-color;
       cursor: pointer;
@@ -198,10 +214,30 @@ menu {
           background-image: url('../../assets/images/menu/language.png');
         }
 
+        &.icon-moonsun  {
+          margin-left: 10px;
+          position: relative;
+          top: -1px;
+          width: 24px;
+          height: 24px;
+
+          background-image: url('../../assets/images/menu/moonsun.svg');
+        }
+
         &:hover {
           opacity: 1;
         }
       }
     }
+  }
+}
+
+@media screen and (max-width: 400px) {
+  .menu-wrapper {
+    width: 100% !important;
+  }
+
+  .top-menu {
+    width: 100%;
   }
 }

@@ -9,7 +9,7 @@ import { AccountVideoRateModel } from '../../../models/account/account-video-rat
 import { ActorModel } from '../../../models/activitypub/actor'
 import { ActorFollowModel } from '../../../models/activitypub/actor-follow'
 import { forwardVideoRelatedActivity } from '../send/utils'
-import { getOrCreateAccountAndVideoAndChannel } from '../videos'
+import { getOrCreateVideoAndAccountAndChannel } from '../videos'
 import { VideoShareModel } from '../../../models/video/video-share'
 
 async function processUndoActivity (activity: ActivityUndo) {
@@ -43,7 +43,7 @@ export {
 async function processUndoLike (actorUrl: string, activity: ActivityUndo) {
   const likeActivity = activity.object as ActivityLike
 
-  const { video } = await getOrCreateAccountAndVideoAndChannel(likeActivity.object)
+  const { video } = await getOrCreateVideoAndAccountAndChannel(likeActivity.object)
 
   return sequelizeTypescript.transaction(async t => {
     const byAccount = await AccountModel.loadByUrl(actorUrl, t)
@@ -67,7 +67,7 @@ async function processUndoLike (actorUrl: string, activity: ActivityUndo) {
 async function processUndoDislike (actorUrl: string, activity: ActivityUndo) {
   const dislike = activity.object.object as DislikeObject
 
-  const { video } = await getOrCreateAccountAndVideoAndChannel(dislike.object)
+  const { video } = await getOrCreateVideoAndAccountAndChannel(dislike.object)
 
   return sequelizeTypescript.transaction(async t => {
     const byAccount = await AccountModel.loadByUrl(actorUrl, t)
@@ -104,17 +104,19 @@ function processUndoFollow (actorUrl: string, followActivity: ActivityFollow) {
 
 function processUndoAnnounce (actorUrl: string, announceActivity: ActivityAnnounce) {
   return sequelizeTypescript.transaction(async t => {
-    const byAccount = await AccountModel.loadByUrl(actorUrl, t)
-    if (!byAccount) throw new Error('Unknown account ' + actorUrl)
+    const byActor = await ActorModel.loadByUrl(actorUrl, t)
+    if (!byActor) throw new Error('Unknown actor ' + actorUrl)
 
     const share = await VideoShareModel.loadByUrl(announceActivity.id, t)
-    if (!share) throw new Error(`'Unknown video share ${announceActivity.id}.`)
+    if (!share) throw new Error(`Unknown video share ${announceActivity.id}.`)
+
+    if (share.actorId !== byActor.id) throw new Error(`${share.url} is not shared by ${byActor.url}.`)
 
     await share.destroy({ transaction: t })
 
     if (share.Video.isOwned()) {
       // Don't resend the activity to the sender
-      const exceptions = [ byAccount.Actor ]
+      const exceptions = [ byActor ]
 
       await forwardVideoRelatedActivity(announceActivity, t, exceptions, share.Video)
     }

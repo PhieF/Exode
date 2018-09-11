@@ -1,12 +1,80 @@
 # Changelog
 
+## v1.0.0-beta.12
+
+**If you have not updated to v1.0.0-beta.10, see the v1.0.0-beta.10.pre.1 changelog, in particular how to upgrade**
+
+### BREAKING CHANGES
+
+ * Users can now use the name they want for their channel. 
+ We will therefore favour the display of video channel handles/names instead of account in the future.
+
+### Documentation
+
+ * Add SECURITY.md document
+ * Add TCP/IP tuning template to prevent buffer bloat/latency ([@scanlime](https://github.com/scanlime))
+ * Add `parse-log` admin tool documentation
+ * Improve README schemas ([@Edznux](https://github.com/edznux))
+
+### nginx template
+
+ * Add gzip support ([@scanlime](https://github.com/scanlime))
+ 
+### Docker template
+ 
+ * Add quota to the docker configuration values ([@kaiyou](https://github.com/kaiyou))
+
+### Features
+
+ * Add portuguese and swedish languages
+ * Support user subscriptions
+ * Add ability to search videos or channels with their URL/handle (can be opt-out by the admin)
+ * Add "videos overview" page (pick randomly some categories/tags/channels and display their videos)
+ * Add ability to set a name (left part of the handle) to a channel instead of UUID
+ * Users can "give" their videos to other local users (WIP, feedback welcome) ([@grizio](https://github.com/grizio))
+ * Add keyboard shortcuts (press `?` to see them) ([@rigelk](https://github.com/rigelk))
+ * Add ability to set daily video upload quota to users ([@Nutomic](https://github.com/nutomic))
+ * Add user email verification (can be opt-in by the admin) ([@joshmorel](https://github.com/joshmorel))
+ * Improve video watch page style ([@rigelk](https://github.com/rigelk))
+ * Trending page takes into account views from the last x days (defined by the admin in the configuration file)
+ * Add "start at" checkbox in the video share modal
+ * Add instance capabilities table in the signup page ([@rigelk](https://github.com/rigelk))
+ * Improve video abuses display in admin ([@Nutomic](https://github.com/nutomic))
+ * Add "my videos" shortcut in menu ([@LeoMouyna](https://github.com/LeoMouyna))
+ * Support 0.75 and 1.25 playback speeds ([@Glandos](https://github.com/Glandos))
+ * Improve error message on actor name conflict
+ * Improve videos list/search SQL query (split it into 2 queries)
+ * Make left menu show the scrollbar only on hover/focus ([@rigelk](https://github.com/rigelk))
+ * Other videos column in watch page show related tagged videos if possible ([@jorropo](https://github.com/jorropo))
+ * Password change errors more friendly ([@jorropo](https://github.com/jorropo))
+ * Improve labels for video privacies (video upload/update)
+ * Add theming via CSS custom properties ([@rigelk](https://github.com/rigelk))
+ * Add dark theme ([@rigelk](https://github.com/rigelk))
+ * Add input color to cope with browser themes ([@rigelk](https://github.com/rigelk))
+
+### Bug fixes
+
+ * Fix player video playback (videos never ends or infinite load after seeking)
+ * Fix video URL import with videos having a small title
+ * Make HSTS opt-in and leave it to the reverse-proxy ([@rigelk](https://github.com/rigelk))
+ * Fix search results on mobile
+ * Do not import live streaming
+ * Fix NSFW filter when the instance decides to hide them and the user decides to list them
+ * Delete highlighted comment too if needed
+ * Fix ffmpeg auto thread admin configuration ([@jorropo](https://github.com/jorropo))
+ * ActivityPub: use height instead of width to represent the video resolution
+ * Fix thumbnail/preview in upload.js script
+ * Fix import-videos.js duplicate detection
+ * Fix occitan language label
+ 
+
 ## v1.0.0-beta.11
 
 **If you have not updated to v1.0.0-beta.10, see the v1.0.0-beta.10.pre.1 changelog, in particular how to upgrade**
 
 ### Features
 
- * Add ability to import videos from a URL (YouTube, Dailymotion, Vimeo, raw file etc) or torrent file/magnet. 
+ * Add ability to import videos from a URL (YouTube, Dailymotion, Vimeo, raw file etc) or torrent file/magnet.
  Should be explicitly enabled by the administrator in the configuration file
  * Add german, spanish, taiwan (traditional chinese) and occitan languages
  * Add ability to delete our account
@@ -20,12 +88,12 @@
  * Tracker only accept known infohash (avoid people to use your tracker for files unrelated to PeerTube)
  * Add database pool configuration ([@rigelk](https://github.com/rigelk))
  * Add audit log ([@Nautigsam](https://github.com/Nautigsam))
- * Add ffmpeg auto thread ([@jorropo](https://github.com/jorropo))
+ * Add ffmpeg nice and auto thread ([@jorropo](https://github.com/jorropo))
  * Upgrade to bootstrap 4
  * DNT support
 
 ### Bug fixes
- 
+
  * Fix videos FPS federation
  * Cleanup request files on bad request
  * Handle truncated markdown links
@@ -58,7 +126,7 @@
  * Move subscription helper in the account line in video watch page
  * Fix responsive on videos search
  * Refresh orphan actors
- * Don't send a follow request if the follow was already accepted 
+ * Don't send a follow request if the follow was already accepted
 
 
 ## v1.0.0-beta.10.pre.2
@@ -85,7 +153,7 @@ $ sudo -u postgres psql peertube_prod -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm
 ```
 
 You will need [PostgreSQL Contrib](https://www.postgresql.org/docs/9.6/static/contrib.html).
-  
+
 ### BREAKING CHANGES
 
  * Require `unaccent` and `pg_trgm` PostgreSQL extension for the PeerTube database
@@ -95,7 +163,7 @@ You will need [PostgreSQL Contrib](https://www.postgresql.org/docs/9.6/static/co
  * Update default cache size configurations
  * Update search API route: `/videos/search` becomes `/search/videos`
  * Needs Redis >= 2.8.18
- 
+
 ### Features
 
  * Add ability to change the language of the interface (currently available: english, french, basque, catalan, czech and esperanto)
@@ -148,7 +216,7 @@ You will need [PostgreSQL Contrib](https://www.postgresql.org/docs/9.6/static/co
 ### Docker
 
  * Add PEERTUBE_SMTP_DISABLE_STARTTLS config env
- 
+
 
 ## v1.0.0-beta.9
 
@@ -400,7 +468,7 @@ You will need [PostgreSQL Contrib](https://www.postgresql.org/docs/9.6/static/co
 
 ## v1.0.0-beta.1
 
-Nothing new here, but PeerTube is stable enough for being in beta now. 
+Nothing new here, but PeerTube is stable enough for being in beta now.
 
 
 ## v1.0.0-alpha.9
@@ -438,7 +506,7 @@ Nothing new here, but PeerTube is stable enough for being in beta now.
 
 ### Features
 
- * Add ability to set a short instance description 
+ * Add ability to set a short instance description
 
 
 ## v1.0.0-alpha.7
@@ -550,7 +618,7 @@ Nothing new here, but PeerTube is stable enough for being in beta now.
 
 ### Features
 
- * Add ability to link a specific comment 
+ * Add ability to link a specific comment
 
 ### Bug fixes
 
